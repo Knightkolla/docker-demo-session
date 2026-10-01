@@ -1,0 +1,7 @@
+# Single stage: the whole Go toolchain ships in the final image
+FROM golang:1.27.1
+WORKDIR /app
+COPY . .
+RUN go build -o server .
+EXPOSE 8080
+CMD ["./server"]

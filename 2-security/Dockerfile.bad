@@ -1,0 +1,10 @@
+# Everything wrong on purpose. Dockerfile.bad.dockerignore is EMPTY, so the
+# default .dockerignore does not apply and .env gets copied into the image.
+FROM node:latest
+WORKDIR /app
+COPY . .
+ENV DB_PASSWORD=supersecret123
+ENV PORT=80
+RUN npm install && npm run build
+EXPOSE 80
+CMD ["node", "dist/server.js"]

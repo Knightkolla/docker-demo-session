@@ -1,0 +1,60 @@
+name: docker
+
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute lowercase image name (GHCR rejects uppercase)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the builder stage
+        uses: docker/build-push-action@v7
+        with:
+          context: 1-multistage
+          file: 1-multistage/Dockerfile.thin
+          target: builder
+          load: true
+          tags: workshop-builder:test
+
+      - name: Run go test inside the image (test the image, not the runner)
+        run: docker run --rm workshop-builder:test go test ./...
+
+      - name: Build the thin image
+        uses: docker/build-push-action@v7
+        with:
+          context: 1-multistage
+          file: 1-multistage/Dockerfile.thin
+          load: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Trivy scan (fails the pipeline on CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          severity: CRITICAL
+          exit-code: "1"
+
+      - name: Push (main only)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag "$IMAGE:$GITHUB_SHA" "$IMAGE:latest"
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:latest"

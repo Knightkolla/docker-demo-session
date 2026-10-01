@@ -1,0 +1,12 @@
+# Stage 1: build (also what CI runs the tests in: --target builder)
+FROM golang:1.27.1-alpine AS builder
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /server .
+
+# Stage 2: ship only the binary on a shell-less base
+FROM gcr.io/distroless/static-debian13:nonroot
+COPY --from=builder /server /server
+USER nonroot
+EXPOSE 8080
+ENTRYPOINT ["/server"]
